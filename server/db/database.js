@@ -221,7 +221,18 @@ function seedInitialData() {
   seedSecondaryDemoCases();
 }
 
-export function seedPrimaryDemoCase() {
+export function seedPrimaryDemoCase(force = false) {
+  if (force) {
+    const demoId = "CF-2026-001247";
+    db.prepare("DELETE FROM actions WHERE issue_id IN (SELECT id FROM issues WHERE complaint_id = ?)").run(demoId);
+    db.prepare("DELETE FROM dependencies WHERE complaint_id = ?").run(demoId);
+    db.prepare("DELETE FROM audit_events WHERE complaint_id = ?").run(demoId);
+    db.prepare("DELETE FROM notifications WHERE complaint_id = ?").run(demoId);
+    db.prepare("DELETE FROM credits WHERE issue_id IN (SELECT id FROM issues WHERE complaint_id = ?)").run(demoId);
+    db.prepare("DELETE FROM issues WHERE complaint_id = ?").run(demoId);
+    db.prepare("DELETE FROM complaints WHERE id = ?").run(demoId);
+  }
+
   const existing = db.prepare("SELECT id FROM complaints WHERE id = 'CF-2026-001247'").get();
   if (existing) return;
 
@@ -757,5 +768,34 @@ function seedSecondaryDemoCases() {
       now,
       now
     );
+  }
+
+  // 6 additional Ward 14 drainage complaints for real Community Signal detection
+  const ward14Cluster = [
+    { id: "CF-2026-001252", desc: "Underground culvert overflow and sewer leakage near Ward 14 playground.", loc: "Ward 14, Playground Road", cat: "Sewage overflow" },
+    { id: "CF-2026-001253", desc: "Drainage backflow during rain in Ward 14 2nd Cross.", loc: "Ward 14, 2nd Cross Street", cat: "Drainage blockage" },
+    { id: "CF-2026-001254", desc: "Sewage leak from damaged manhole near Ward 14 primary health clinic.", loc: "Ward 14, Health Center Lane", cat: "Sewage overflow" },
+    { id: "CF-2026-001255", desc: "Blocked stormwater drain on Ward 14 North Avenue causing water stagnation.", loc: "Ward 14, North Avenue", cat: "Drainage blockage" },
+    { id: "CF-2026-001256", desc: "Sewer odor and wastewater pooling at Ward 14 market junction.", loc: "Ward 14, Market Junction", cat: "Sewage overflow" },
+    { id: "CF-2026-001257", desc: "Repeated sullage overflow on Ward 14 residential link street.", loc: "Ward 14, Residential Link 3", cat: "Sewage overflow" }
+  ];
+
+  for (const item of ward14Cluster) {
+    const exists = db.prepare("SELECT id FROM complaints WHERE id = ?").get(item.id);
+    if (!exists) {
+      db.prepare(`
+        INSERT INTO complaints (id, user_id, citizen_name, description, language, location, category, status, severity, priority, risk_score, risk_level, analysis_source, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        item.id, "user-citizen-1", "Local Resident", item.desc, "English", item.loc, item.cat, "IN_PROGRESS", "HIGH", "HIGH", 60, "MEDIUM", "Deterministic fallback", now, now
+      );
+
+      db.prepare(`
+        INSERT INTO issues (id, display_id, complaint_id, title, category, severity, department, routing_reason, status, deadline, deadline_hours, risk_score, risk_level, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        `issue-${item.id}-1`, "I-1", item.id, item.cat, item.cat, "HIGH", "Drainage Department", `Category = ${item.cat} | Asset = Municipal stormwater culvert`, "IN_PROGRESS", deadlineDate, 24, 60, "MEDIUM", now, now
+      );
+    }
   }
 }

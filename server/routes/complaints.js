@@ -9,6 +9,8 @@ import { calculateIssueRisk, calculateComplaintRisk } from "../services/riskEngi
 import { createAuditEvent, getAuditTrail } from "../services/auditService.js";
 import { createNotification } from "../services/notificationService.js";
 import { getIssueDependencies } from "../services/dependencyEngine.js";
+import { calculateCivicImpact } from "../services/civicImpactEngine.js";
+import { detectCommunitySignal } from "../services/communitySignalEngine.js";
 
 const router = express.Router();
 
@@ -306,15 +308,96 @@ router.get("/:id", requireAuth, verifyComplaintAccess, (req, res) => {
     // Fetch audit trail
     const auditTrail = getAuditTrail(complaint.id);
 
+    // Calculate Explainable Civic Impact & Community Signal
+    const civicImpact = calculateCivicImpact(complaint, enrichedIssues);
+    const communitySignal = detectCommunitySignal(complaint);
+
     res.json({
       complaint,
       issues: enrichedIssues,
       dependencies: allDependencies,
-      auditTrail
+      auditTrail,
+      civicImpact,
+      communitySignal
     });
   } catch (err) {
     console.error("Get complaint detail error:", err);
     res.status(500).json({ error: "Failed to retrieve case details" });
+  }
+});
+
+// POST /api/complaints/copilot - Citizen Copilot natural language problem parser
+router.post("/copilot", async (req, res) => {
+  try {
+    const { text, language = "auto" } = req.body;
+    if (!text || text.trim().length < 3) {
+      return res.status(400).json({ error: "Please describe the problem you are experiencing" });
+    }
+
+    const analysis = await analyzeComplaintText(text, language);
+
+    const detectedIssueTitles = analysis.issues.map((i) => i.title);
+    const responsibleAuthorities = [...new Set(analysis.issues.map((i) => i.department))];
+
+    const understanding = analysis.language === "Tamil" ? "உங்கள் பிரச்சனை புரிந்து கொள்ளப்பட்டது" : "I understood your problem";
+
+    res.json({
+      message: understanding,
+      understanding,
+      detectedIssues: detectedIssueTitles,
+      issues: analysis.issues,
+      issuesDetails: analysis.issues,
+      responsibleAuthorities,
+      departments: responsibleAuthorities,
+      dependencies: analysis.dependencies || [],
+      severity: analysis.severity,
+      priority: analysis.priority,
+      analysisSource: analysis.analysisSource,
+      language: analysis.language,
+      keyProductMessage: "Citizens describe problems. CivicFlow translates them into action."
+    });
+  } catch (err) {
+    console.error("Copilot error:", err);
+    res.status(500).json({ error: "Copilot understanding engine encountered an error" });
+  }
+});
+
+// POST /api/complaints/:id/request-update - Citizen requests priority status update ("Who can help me?")
+router.post("/:id/request-update", requireAuth, verifyComplaintAccess, (req, res) => {
+  try {
+    const complaint = req.complaint;
+    const now = new Date().toISOString();
+
+    // Log audit event
+    createAuditEvent({
+      complaintId: complaint.id,
+      eventType: "CITIZEN_UPDATE_REQUESTED",
+      actorId: req.user.id,
+      actorName: req.user.name,
+      actorRole: "CITIZEN",
+      description: `Citizen ${req.user.name} requested an expedited progress update and accountability review for ${complaint.id}.`
+    });
+
+    // Notify assigned departmental officers
+    const issues = db.prepare("SELECT DISTINCT department FROM issues WHERE complaint_id = ?").all(complaint.id);
+    for (const item of issues) {
+      createNotification({
+        department: item.department,
+        role: "OFFICER",
+        complaintId: complaint.id,
+        title: "Citizen Update Requested",
+        message: `Citizen ${req.user.name} requested an expedited status review for grievance ${complaint.id}.`,
+        type: "INFO"
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Priority status update requested from departmental supervisors."
+    });
+  } catch (err) {
+    console.error("Request update error:", err);
+    res.status(500).json({ error: "Failed to submit update request" });
   }
 });
 

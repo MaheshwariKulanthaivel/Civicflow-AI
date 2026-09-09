@@ -2,7 +2,13 @@ import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
-import DependencyGraph from "../components/DependencyGraph";
+import CivicProblemGraph from "../components/CivicProblemGraph";
+import WhyWaitingCard from "../components/WhyWaitingCard";
+import ResolutionJourney from "../components/ResolutionJourney";
+import CivicImpactCard from "../components/CivicImpactCard";
+import CommunitySignalCard from "../components/CommunitySignalCard";
+import PreventiveInsightCard from "../components/PreventiveInsightCard";
+import CivicFlowConnect from "../components/CivicFlowConnect";
 import AuditTimeline from "../components/AuditTimeline";
 import RiskBadge from "../components/RiskBadge";
 import { 
@@ -19,8 +25,7 @@ import {
   Sparkles,
   Camera,
   Layers,
-  Calendar,
-  AlertTriangle
+  Building2
 } from "lucide-react";
 
 export default function CitizenCaseDetail() {
@@ -38,7 +43,7 @@ export default function CitizenCaseDetail() {
   const [reopenReason, setReopenReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Success toast/message
+  // Feedback toast
   const [feedbackMessage, setFeedbackMessage] = useState("");
 
   const fetchCaseDetails = () => {
@@ -66,7 +71,7 @@ export default function CitizenCaseDetail() {
 
   useEffect(() => {
     fetchCaseDetails();
-    // Real-time feel: poll every 3 seconds to reflect officer actions instantly!
+    // Real-time polling every 3 seconds
     const interval = setInterval(fetchCaseDetails, 3000);
     return () => clearInterval(interval);
   }, [id, token]);
@@ -84,7 +89,7 @@ export default function CitizenCaseDetail() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to confirm resolution");
 
-      setFeedbackMessage(`Resolution verified! Awarded +${data.pointsAwarded} Civic Service Credits to the department.`);
+      setFeedbackMessage(`Citizen Verified Resolution! Awarded +${data.pointsAwarded} Civic Service Credits to the department.`);
       fetchCaseDetails();
     } catch (err) {
       alert(err.message);
@@ -148,17 +153,18 @@ export default function CitizenCaseDetail() {
     );
   }
 
-  const { complaint, issues, dependencies, auditTrail } = caseData;
+  const { complaint, issues, dependencies, auditTrail, civicImpact, communitySignal } = caseData;
+  const blockedIssues = issues.filter((i) => i.status === "BLOCKED");
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       
-      {/* Top Breadcrumb & Actions */}
+      {/* Top Breadcrumb & Live Sync */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-3">
           <Link
             to="/citizen"
-            className="p-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition"
+            className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
@@ -195,34 +201,37 @@ export default function CitizenCaseDetail() {
       </div>
 
       {feedbackMessage && (
-        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 font-medium flex items-center justify-between">
+        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-300 text-xs text-emerald-900 font-bold flex items-center justify-between animate-in fade-in">
           <div className="flex items-center space-x-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
             <span>{feedbackMessage}</span>
           </div>
           <button onClick={() => setFeedbackMessage("")} className="text-emerald-700 font-bold ml-2">✕</button>
         </div>
       )}
 
-      {/* Complaint Overview Card */}
+      {/* Hero Grievance Overview Card */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
           <div className="space-y-2 max-w-3xl">
             <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600">
-              Citizen Grievance Description
+              Registered Grievance Statement
             </span>
             <p className="text-base sm:text-lg font-medium text-slate-900 leading-relaxed italic">
               "{complaint.description}"
             </p>
-            <div className="flex flex-wrap items-center gap-3 pt-2 text-xs text-slate-500 font-mono">
-              <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+            <div className="flex flex-wrap items-center gap-2 pt-2 text-xs font-mono text-slate-500">
+              <span className="px-2.5 py-1 rounded bg-slate-100 text-slate-700">
                 Language: {complaint.language}
               </span>
-              <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+              <span className="px-2.5 py-1 rounded bg-slate-100 text-slate-700">
                 Severity: {complaint.severity}
               </span>
-              <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+              <span className="px-2.5 py-1 rounded bg-slate-100 text-slate-700">
                 Analysis: {complaint.analysis_source}
+              </span>
+              <span className="px-2.5 py-1 rounded bg-blue-50 text-blue-800 font-bold">
+                {issues.length} Atomic Work Orders
               </span>
             </div>
           </div>
@@ -231,26 +240,49 @@ export default function CitizenCaseDetail() {
             <RiskBadge
               score={complaint.risk_score}
               level={complaint.risk_level}
-              reasons={["Multi-department dependency chain active", "School perimeter public safety concern"]}
+              reasons={["Inter-departmental dependency locking Roads Dept", "School perimeter vulnerability"]}
             />
           </div>
         </div>
       </div>
 
-      {/* Visual Connected Dependency Graph */}
-      <DependencyGraph complaint={complaint} issues={issues} dependencies={dependencies} />
+      {/* 1. Resolution Journey ("What happens next?") */}
+      <ResolutionJourney complaint={complaint} issues={issues} />
 
-      {/* Issue-by-Issue Transparent Breakdown */}
+      {/* 2. Civic Problem Graph */}
+      <CivicProblemGraph complaint={complaint} issues={issues} dependencies={dependencies} />
+
+      {/* 3. Why is my complaint waiting? (Shows when an issue is BLOCKED) */}
+      <WhyWaitingCard blockedIssues={blockedIssues} dependencies={dependencies} />
+
+      {/* 4. Intelligence Grid: Civic Impact & Community Signal */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Civic Impact */}
+        <CivicImpactCard impactData={civicImpact} />
+
+        {/* Community Signal & Locality Clustering */}
+        <CommunitySignalCard signalData={communitySignal} />
+      </div>
+
+      {/* 5. Preventive Governance Insight */}
+      {communitySignal?.preventiveInsight && (
+        <PreventiveInsightCard insightData={communitySignal.preventiveInsight} />
+      )}
+
+      {/* 6. CivicFlow Connect: Who can help me? */}
+      <CivicFlowConnect complaint={complaint} issues={issues} onUpdateRequested={fetchCaseDetails} />
+
+      {/* 7. Atomic Departmental Work Orders */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Layers className="w-5 h-5 text-blue-600" />
             <h2 className="font-bold text-lg text-slate-900">
-              Atomic Department Work Orders ({issues.length})
+              {t("detectedIssues")} ({issues.length})
             </h2>
           </div>
           <span className="text-xs text-slate-500">
-            Independent departmental execution with automatic dependency gates
+            Independent departmental execution with automatic dependency unlock gates
           </span>
         </div>
 
@@ -281,14 +313,15 @@ export default function CitizenCaseDetail() {
                         {iss.display_id}
                       </span>
                       <h3 className="font-bold text-base text-slate-900">{iss.title}</h3>
-                      <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                        {iss.department}
+                      <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 flex items-center space-x-1">
+                        <Building2 className="w-3.5 h-3.5 text-blue-500" />
+                        <span>{iss.department}</span>
                       </span>
                     </div>
 
-                    {/* Citizen friendly dependency notice */}
+                    {/* Dependency notice */}
                     {iss.dependencies?.citizenExplanation && (
-                      <div className="flex items-center space-x-2 text-xs font-semibold text-slate-700 pt-1">
+                      <div className="text-xs font-semibold text-slate-700 pt-1">
                         {isBlocked ? (
                           <span className="text-red-700 flex items-center space-x-1.5">
                             <Lock className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
@@ -304,7 +337,7 @@ export default function CitizenCaseDetail() {
                     )}
                   </div>
 
-                  {/* Status & Verification Action Buttons */}
+                  {/* Status & Verification Buttons */}
                   <div className="flex flex-wrap items-center gap-2">
                     <span
                       className={`text-xs font-bold px-3 py-1 rounded-full border ${
@@ -322,13 +355,13 @@ export default function CitizenCaseDetail() {
                       {iss.status}
                     </span>
 
-                    {/* CITIZEN INDEPENDENT RESOLUTION VERIFICATION */}
+                    {/* Citizen Independent Verification */}
                     {isCompleted && (
                       <div className="flex items-center space-x-2">
                         <button
                           onClick={() => handleConfirmResolution(iss.id)}
                           disabled={actionLoading}
-                          className="px-3 py-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-sm transition flex items-center space-x-1"
+                          className="px-3.5 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-xs transition flex items-center space-x-1"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>{t("confirmResolved")}</span>
@@ -337,7 +370,7 @@ export default function CitizenCaseDetail() {
                         <button
                           onClick={() => setReopenIssueId(iss.id)}
                           disabled={actionLoading}
-                          className="px-3 py-1 text-xs font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-lg transition flex items-center space-x-1"
+                          className="px-3.5 py-1.5 text-xs font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-lg transition flex items-center space-x-1"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
                           <span>{t("stillNotResolved")}</span>
@@ -348,7 +381,7 @@ export default function CitizenCaseDetail() {
                     {isConfirmed && (
                       <div className="flex items-center space-x-1 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
                         <Award className="w-4 h-4 text-amber-500" />
-                        <span>Civic Credits Awarded</span>
+                        <span>Citizen Verified • +17 Credits Awarded</span>
                       </div>
                     )}
                   </div>
@@ -360,12 +393,12 @@ export default function CitizenCaseDetail() {
                   <p className="text-[11px] text-slate-600">{iss.routing_reason}</p>
                 </div>
 
-                {/* Resolution Proof (if officer completed work) */}
+                {/* Resolution Proof Card */}
                 {iss.resolution_proof && (
-                  <div className="mt-3 p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs text-emerald-900">
+                  <div className="mt-3 p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs text-emerald-900">
                     <div className="font-bold flex items-center space-x-1.5 mb-1">
                       <Camera className="w-3.5 h-3.5 text-emerald-700" />
-                      <span>{t("resolutionProof")} Uploaded by Officer:</span>
+                      <span>{t("resolutionProof")} Uploaded by Assigned Officer:</span>
                     </div>
                     <p className="text-[11px] italic font-medium">"{iss.resolution_proof}"</p>
                     {iss.resolved_at && (
@@ -380,7 +413,7 @@ export default function CitizenCaseDetail() {
                 {iss.actions && iss.actions.length > 0 && (
                   <div className="mt-4 pt-3 border-t border-slate-100">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-2">
-                      Standard Operating Procedure (SOP) Action Checklist
+                      SOP Field Action Checklist
                     </span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {iss.actions.map((act) => (
@@ -414,7 +447,7 @@ export default function CitizenCaseDetail() {
         </div>
       </div>
 
-      {/* Chronological Audit Trail */}
+      {/* 8. Immutable Audit Timeline */}
       <AuditTimeline events={auditTrail} />
 
       {/* Reopen Grievance Modal */}

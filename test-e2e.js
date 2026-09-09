@@ -29,6 +29,7 @@ async function runTests() {
   console.log("==================================================================");
 
   initializeDatabase();
+  seedPrimaryDemoCase(true);
   const server = app.listen(PORT);
 
   try {
@@ -213,11 +214,89 @@ async function runTests() {
     console.log("Decomposed Issues Count:", newGrievanceData.issuesCount, "Severity:", newGrievanceData.severity);
     if (newGrievanceData.issuesCount < 2) throw new Error("Failed to decompose multi-issue grievance!");
 
+    // 15. CivicFlow Copilot Verification (English + Tamil NLP decomposition)
+    console.log("\n[TEST 15] CivicFlow Copilot Grievance Intake (English & Tamil)");
+    const copilotEnRes = await fetch(`${BASE_URL}/api/complaints/copilot`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${citizenToken}`
+      },
+      body: JSON.stringify({
+        text: "Sewage overflow and broken streetlight near elementary school",
+        language: "en"
+      })
+    });
+    const copilotEn = await copilotEnRes.json();
+    console.log("Copilot English Understanding:", copilotEn.understanding);
+    console.log("Copilot Detected Issues:", copilotEn.issues.map(i => `${i.title} (${i.department})`).join(" | "));
+    if (!copilotEn.issues || copilotEn.issues.length < 2) throw new Error("Copilot English failed to decompose issues");
+
+    const copilotTaRes = await fetch(`${BASE_URL}/api/complaints/copilot`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${citizenToken}`
+      },
+      body: JSON.stringify({
+        text: "பள்ளி அருகில் கழிவுநீர் தேங்கி சாலை சேதமடைந்துள்ளது",
+        language: "ta"
+      })
+    });
+    const copilotTa = await copilotTaRes.json();
+    console.log("Copilot Tamil Understanding:", copilotTa.understanding);
+    console.log("Copilot Tamil Detected Issues:", copilotTa.issues.map(i => `${i.title} (${i.department})`).join(" | "));
+    if (!copilotTa.issues || copilotTa.issues.length < 2) throw new Error("Copilot Tamil failed to decompose issues");
+
+    // 16. Verify Civic Impact & Community Signal on Primary Case
+    console.log("\n[TEST 16] Verify Civic Impact & Community Signal on Primary Case");
+    console.log("Civic Impact Level:", caseData.civicImpact?.level, "Score:", caseData.civicImpact?.score);
+    console.log("Impact Domains:", caseData.civicImpact?.domains?.map(d => `${d.label}: ${d.score}/100`).join(", "));
+    if (caseData.civicImpact?.level !== "HIGH") throw new Error(`Expected HIGH civic impact, got ${caseData.civicImpact?.level}`);
+    
+    console.log("Community Signal Cluster:", caseData.communitySignal?.hasCluster, "Count:", caseData.communitySignal?.clusterCount);
+    console.log("Cluster Locality:", caseData.communitySignal?.locality);
+    console.log("Preventive Insight:", caseData.communitySignal?.preventiveInsight?.title);
+    if (caseData.communitySignal?.clusterCount !== 7) {
+      throw new Error(`Expected clusterCount of 7, got ${caseData.communitySignal?.clusterCount}`);
+    }
+
+    // 17. Citizen Request Update & Audit Trail
+    console.log("\n[TEST 17] Citizen Request Update (CivicFlow Connect)");
+    const reqUpdateRes = await fetch(`${BASE_URL}/api/complaints/CF-2026-001247/request-update`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${citizenToken}`
+      },
+      body: JSON.stringify({ reason: "School reopening tomorrow morning, critical need for status" })
+    });
+    const reqUpdateData = await reqUpdateRes.json();
+    console.log("Request Update Status:", reqUpdateRes.status, "Response:", reqUpdateData.message);
+    if (reqUpdateRes.status !== 200) throw new Error("Request Update failed!");
+
+    const postReqAuditRes = await fetch(`${BASE_URL}/api/audit/CF-2026-001247`, {
+      headers: { Authorization: `Bearer ${citizenToken}` }
+    });
+    const postReqAuditData = await postReqAuditRes.json();
+    const updateReqEvent = postReqAuditData.auditTrail.find((e) => e.event_type === "CITIZEN_UPDATE_REQUESTED");
+    if (!updateReqEvent) throw new Error("CITIZEN_UPDATE_REQUESTED audit event was not found!");
+    console.log("Verified audit trail contains CITIZEN_UPDATE_REQUESTED event:", updateReqEvent.description);
+
+    // 18. Officer Dashboard Enhanced Metrics & Problem Graph
+    console.log("\n[TEST 18] Officer Operations Control Center Enhanced Metrics");
+    console.log("Active Issues:", dashData.active, "Due Soon:", dashData.dueSoon, "Avg Hours:", dashData.average_resolution_hours);
+    console.log("Primary Case Graph Included:", !!dashData.primaryCaseGraph, "Graph Issues:", dashData.primaryCaseGraph?.issues?.length);
+    if (!dashData.primaryCaseGraph || !dashData.communitySignals) {
+      throw new Error("Officer dashboard missing primaryCaseGraph or communitySignals");
+    }
+
     console.log("\n==================================================================");
-    console.log("ALL 14 E2E VERIFICATION TESTS PASSED FLAWLESSLY!");
+    console.log("ALL 18 E2E VERIFICATION TESTS PASSED FLAWLESSLY!");
     console.log("==================================================================");
 
   } finally {
+    seedPrimaryDemoCase(true);
     server.close();
   }
 }

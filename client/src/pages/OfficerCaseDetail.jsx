@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
-import DependencyGraph from "../components/DependencyGraph";
+import CivicProblemGraph from "../components/CivicProblemGraph";
 import AuditTimeline from "../components/AuditTimeline";
 import RiskBadge from "../components/RiskBadge";
 import ResolutionProofModal from "../components/ResolutionProofModal";
@@ -245,8 +245,8 @@ export default function OfficerCaseDetail() {
         </div>
       </div>
 
-      {/* Dependency Graph */}
-      <DependencyGraph complaint={complaint} issues={issues} dependencies={dependencies} />
+      {/* Civic Problem Graph */}
+      <CivicProblemGraph complaint={complaint} issues={issues} dependencies={dependencies} />
 
       {/* Department Work Tasks */}
       <div className="space-y-4">
