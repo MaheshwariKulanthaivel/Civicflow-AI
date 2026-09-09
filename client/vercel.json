@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://civicflow-ai-backend-sg78.onrender.com/api/:path*"
+    }
+  ]
+}
